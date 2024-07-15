@@ -80,8 +80,17 @@ class VQADataset(torch.utils.data.Dataset):
             question = process_text(question)
             words = question.split(" ")
             for word in words:
+                word = process_text(word)
                 if word not in self.question2idx:
                     self.question2idx[word] = len(self.question2idx)
+        """
+        for question in self.df["question"]:
+            question = process_text(question)
+            words = question.split(" ")
+            for word in words:
+                if word not in self.question2idx:
+                    self.question2idx[word] = len(self.question2idx)
+        """
         self.idx2question = {v: k for k, v in self.question2idx.items()}  # 逆変換用の辞書(question)
 
         if self.answer:
@@ -134,7 +143,8 @@ class VQADataset(torch.utils.data.Dataset):
         question_words = self.df["question"][idx].split(" ")
         for word in question_words:
             try:
-                question[self.question2idx[word]] = 1  # one-hot表現に変換
+                #question[self.question2idx[word]] = 1  # one-hot表現に変換
+                question[self.question2idx[process_text(word)]] = 1  # one-hot表現に変換
             except KeyError:
                 question[-1] = 1  # 未知語
 
@@ -324,7 +334,7 @@ def train(model, dataloader, optimizer, criterion, device):
 
         pred = model(image, question)
         loss = criterion(pred, mode_answer.squeeze())
-
+        
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -368,18 +378,21 @@ def main():
         transforms.Resize((224, 224)),
         transforms.ToTensor()
     ])
-    train_dataset = VQADataset(df_path="./data/train.json", image_dir="./data/train", transform=transform)
-    test_dataset = VQADataset(df_path="./data/valid.json", image_dir="./data/valid", transform=transform, answer=False)
+    #train_dataset = VQADataset(df_path="./data/train.json", image_dir="./data/train", transform=transform)
+    #test_dataset = VQADataset(df_path="./data/valid.json", image_dir="./data/valid", transform=transform, answer=False)
+    train_dataset = VQADataset(df_path="./data/train.json", image_dir="/content/data/train", transform=transform)
+    test_dataset = VQADataset(df_path="./data/valid.json", image_dir="/content/data/valid", transform=transform, answer=False)
     test_dataset.update_dict(train_dataset)
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     model = VQAModel(vocab_size=len(train_dataset.question2idx)+1, n_answer=len(train_dataset.answer2idx)).to(device)
 
     # optimizer / criterion
-    num_epoch = 20
+    num_epoch = 5
     criterion = nn.CrossEntropyLoss()
+    #criterion = nn.KLDivLoss(reduction="batchmean")
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
     # train model
@@ -407,4 +420,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    print("test")
