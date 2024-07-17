@@ -334,7 +334,7 @@ def train(model, dataloader, optimizer, criterion, device):
 
         pred = model(image, question)
         loss = criterion(pred, mode_answer.squeeze())
-        
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -368,20 +368,55 @@ def eval(model, dataloader, optimizer, criterion, device):
     return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
 
 
+class gcn():
+    def __init__(self):
+        pass
+
+    def __call__(self, x):
+        mean = torch.mean(x)
+        std = torch.std(x)
+        return (x - mean)/(std + 10**(-6))
+
+# 標準化後の画像を[0, 1]に正規化する
+def deprocess(x):
+    """
+    Argument
+    --------
+    x : np.ndarray
+        入力画像．(H, W, C)
+
+    Return
+    ------
+    _x : np.ndarray
+        [0, 1]で正規化した画像．(H, W, C)
+    """
+    _min = np.min(x)
+    _max = np.max(x)
+    _x = (x - _min)/(_max - _min)
+    return _x
+
 def main():
     # deviceの設定
     set_seed(42)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # dataloader / model
-    transform = transforms.Compose([
+    GCN = gcn()
+    transform_train = transforms.Compose([
+        transforms.RandomHorizontalFlip(p=1.0),
+        transforms.RandomRotation(degrees=(-180, 180)),
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        GCN
+    ])
+    transform_test = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor()
     ])
     #train_dataset = VQADataset(df_path="./data/train.json", image_dir="./data/train", transform=transform)
     #test_dataset = VQADataset(df_path="./data/valid.json", image_dir="./data/valid", transform=transform, answer=False)
-    train_dataset = VQADataset(df_path="./data/train.json", image_dir="/content/data/train", transform=transform)
-    test_dataset = VQADataset(df_path="./data/valid.json", image_dir="/content/data/valid", transform=transform, answer=False)
+    train_dataset = VQADataset(df_path="./data/train.json", image_dir="/content/data/train", transform=transform_train)
+    test_dataset = VQADataset(df_path="./data/valid.json", image_dir="/content/data/valid", transform=transform_test, answer=False)
     test_dataset.update_dict(train_dataset)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -391,8 +426,7 @@ def main():
 
     # optimizer / criterion
     num_epoch = 5
-    criterion = nn.CrossEntropyLoss()
-    #criterion = nn.KLDivLoss(reduction="batchmean")
+    criterion = nn.CrossEntropyLoss() #nn.KLDivLoss(reduction="batchmean")
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
     # train model
