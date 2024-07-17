@@ -1,3 +1,7 @@
+# データをランタイムにコピー
+# Tomoki Yoshida様がslack上で投稿された下記のコードを使用
+# https://dl2024.slack.com/archives/C06N1645DHT/p1719207616467449?thread_ts=1719203386.330599&cid=C06N1645DHT
+
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
